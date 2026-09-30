@@ -18,6 +18,10 @@ type reserveRunRequest struct {
 	VesselID string `json:"vessel_id"`
 }
 
+type switchVesselRequest struct {
+	VesselID string `json:"vessel_id"`
+}
+
 type observationRequest struct {
 	Sequence     int       `json:"sequence"`
 	Gravity      float64   `json:"gravity"`
@@ -81,6 +85,31 @@ func registerRunRoutes(mux *http.ServeMux, app *service.Service) {
 			return
 		}
 		writeJSON(response, http.StatusOK, map[string]any{"run": run, "vessel": vessel})
+	})
+
+	mux.HandleFunc("POST /v1/runs/{id}/switch-vessel", func(response http.ResponseWriter, request *http.Request) {
+		body, err := decodeJSON[switchVesselRequest](response, request)
+		if !handleDecode(response, err) {
+			return
+		}
+		expected, err := expectedVersion(request)
+		if !handleDecode(response, err) {
+			return
+		}
+		run, vessel, released, err := app.SwitchRunVessel(request.PathValue("id"),
+			service.SwitchRunVesselInput{
+				ExpectedVersion: expected,
+				VesselID:        body.VesselID,
+			})
+		if err != nil {
+			writeDomainError(response, err)
+			return
+		}
+		writeJSON(response, http.StatusOK, map[string]any{
+			"run":             run,
+			"vessel":          vessel,
+			"released_vessel": released,
+		})
 	})
 
 	mux.HandleFunc("POST /v1/runs/{id}/start", func(response http.ResponseWriter, request *http.Request) {

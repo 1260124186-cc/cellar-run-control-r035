@@ -88,6 +88,7 @@ Run workflow:
 - `GET /v1/runs`
 - `GET /v1/runs/{id}`
 - `POST /v1/runs/{id}/reserve`
+- `POST /v1/runs/{id}/switch-vessel`
 - `POST /v1/runs/{id}/start`
 - `POST /v1/runs/{id}/observations`
 - `POST /v1/runs/{id}/conditioning`
@@ -115,6 +116,7 @@ Run each production workflow check separately:
 go run ./cmd/fermentctl check formula-approval
 go run ./cmd/fermentctl check vessel-run-lifecycle
 go run ./cmd/fermentctl check observations-completion
+go run ./cmd/fermentctl check vessel-switch
 ```
 
 Each check creates a temporary snapshot directory, starts the real HTTP

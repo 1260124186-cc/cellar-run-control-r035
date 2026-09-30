@@ -74,6 +74,9 @@ and `aborted`.
 - Only an approved formula may be attached to a run.
 - `planned -> reserved` atomically reserves an available vessel.
 - `reserved -> fermenting` requires that the vessel still belongs to the run.
+- A reserved run that has not started can switch to a different available
+  vessel with sufficient capacity. The formula and planned volume do not
+  change, and the original vessel is released only when the switch commits.
 - `fermenting -> conditioning` requires at least two observations.
 - `conditioning -> completed` requires at least three observations.
 - Completion computes apparent attenuation and estimated alcohol by volume from
@@ -122,13 +125,15 @@ Public entry points are:
 - `POST /v1/vessels`
 - `POST /v1/runs`
 - `POST /v1/runs/{id}/reserve`
+- `POST /v1/runs/{id}/switch-vessel`
 - `POST /v1/runs/{id}/start`
 - `GET /v1/runs/{id}`
 
 The client registers a vessel, creates a planned run against an approved
-formula, reserves the vessel, starts fermentation, and reads the run. Capacity
-conflicts, an unavailable vessel, duplicate run codes, and stale versions
-produce stable failures without changing vessel or run state.
+formula, reserves the vessel, optionally switches the reservation to another
+available vessel before fermentation starts, starts fermentation, and reads
+the run. Capacity conflicts, an unavailable vessel, duplicate run codes, and
+stale versions produce stable failures without changing vessel or run state.
 
 This path crosses HTTP protocol handling, application orchestration, domain
 rules, storage coordination, and resource lifecycle.
@@ -210,13 +215,14 @@ task owns systematic tests for validation boundaries, state transitions,
 numeric calculations, stale revisions, storage failures, and concurrent
 reservation attempts.
 
-The current build command is `go build ./...`. Three bounded production checks
+The current build command is `go build ./...`. Four bounded production checks
 start the real HTTP handler, issue real JSON requests, check success and failure
 behavior, and exit without external services:
 
 - `go run ./cmd/fermentctl check formula-approval`
 - `go run ./cmd/fermentctl check vessel-run-lifecycle`
 - `go run ./cmd/fermentctl check observations-completion`
+- `go run ./cmd/fermentctl check vessel-switch`
 
 ## Scope Limits
 

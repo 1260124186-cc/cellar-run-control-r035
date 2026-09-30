@@ -42,6 +42,11 @@ type ReserveRunInput struct {
 	VesselID        string
 }
 
+type SwitchRunVesselInput struct {
+	ExpectedVersion *int64
+	VesselID        string
+}
+
 type ObservationInput struct {
 	Sequence     int
 	Gravity      float64

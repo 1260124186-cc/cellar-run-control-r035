@@ -138,6 +138,60 @@ func (s *Service) StartRun(
 	return updatedRun, updatedVessel, nil
 }
 
+func (s *Service) SwitchRunVessel(
+	id string,
+	input SwitchRunVesselInput,
+) (domain.FermentationRun, domain.Vessel, domain.Vessel, error) {
+	var updatedRun domain.FermentationRun
+	var updatedVessel domain.Vessel
+	var releasedVessel domain.Vessel
+	err := s.store.Execute(func(snapshot *domain.Snapshot) error {
+		run, ok := snapshot.Runs[id]
+		if !ok {
+			return domain.NewError(domain.CodeRunNotFound, "run was not found")
+		}
+		if err := s.checkExpected(run.Version, input.ExpectedVersion); err != nil {
+			return err
+		}
+		if run.VesselID == nil {
+			return domain.NewError(domain.CodeRunState, "run has no vessel")
+		}
+		current, ok := snapshot.Vessels[*run.VesselID]
+		if !ok {
+			return domain.NewError(domain.CodeVesselNotFound,
+				"current vessel was not found")
+		}
+		next, ok := snapshot.Vessels[input.VesselID]
+		if !ok {
+			return domain.NewError(domain.CodeVesselNotFound, "vessel was not found")
+		}
+		if run.PlannedVolumeL > next.CapacityL {
+			return domain.FieldError(domain.CodeInvalidInput,
+				"planned_volume_liters", "exceeds vessel capacity")
+		}
+		if err := next.Reserve(run.ID, s.clock.Now()); err != nil {
+			return err
+		}
+		if err := run.ChangeVessel(next.ID, s.clock.Now()); err != nil {
+			return err
+		}
+		if err := current.ReleaseReservation(run.ID, s.clock.Now()); err != nil {
+			return err
+		}
+		snapshot.Runs[id] = run.Clone()
+		snapshot.Vessels[next.ID] = next
+		snapshot.Vessels[current.ID] = current
+		updatedRun = run.Clone()
+		updatedVessel = next
+		releasedVessel = current
+		return nil
+	})
+	if err != nil {
+		return domain.FermentationRun{}, domain.Vessel{}, domain.Vessel{}, err
+	}
+	return updatedRun, updatedVessel, releasedVessel, nil
+}
+
 func (s *Service) AbortRun(
 	id string,
 	input VersionInput,

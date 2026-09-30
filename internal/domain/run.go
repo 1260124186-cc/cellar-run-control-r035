@@ -91,6 +91,24 @@ func (r *FermentationRun) StartFermentation(now time.Time) error {
 	return nil
 }
 
+// ChangeVessel moves a reserved run to another vessel before fermentation
+// starts. The run must still be reserved and must not have started. The
+// formula and planned volume are intentionally left untouched.
+func (r *FermentationRun) ChangeVessel(vesselID string, now time.Time) error {
+	if r.State != RunReserved || r.VesselID == nil {
+		return NewError(CodeRunState, "only a reserved run can change its vessel")
+	}
+	if r.StartedAt != nil {
+		return NewError(CodeRunState,
+			"a run that has started fermentation cannot change its vessel")
+	}
+	value := vesselID
+	r.VesselID = &value
+	r.UpdatedAt = now.UTC()
+	r.Version++
+	return nil
+}
+
 func (r *FermentationRun) AddObservation(observation GravityObservation) error {
 	if r.State != RunFermenting || r.StartedAt == nil {
 		return NewError(CodeRunState, "observations require a fermenting run")
