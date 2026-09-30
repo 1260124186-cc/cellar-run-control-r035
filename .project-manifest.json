@@ -113,6 +113,27 @@
         "domain",
         "storage"
       ]
+    },
+    {
+      "id": "vessel-switch",
+      "name": "Switch a reserved run to another vessel before fermentation",
+      "entry": "POST /v1/runs/{id}/switch-vessel",
+      "steps": [
+        "reserve a vessel for a planned run",
+        "switch the reserved run to a different available vessel",
+        "verify the original vessel is released and the new vessel reserved by the run",
+        "reject capacity, state, same-vessel, stale-version, and concurrent switches",
+        "start fermentation on the new vessel with the post-switch version"
+      ],
+      "success": "returns the run plus both vessels, with formula and planned volume unchanged",
+      "failure": "returns a stable capacity, availability, state, or revision conflict without partial writes",
+      "verification": "the check issues real HTTP requests, including a concurrent switch race, and reads final ownership",
+      "module_ids": [
+        "httpapi",
+        "service",
+        "domain",
+        "storage"
+      ]
     }
   ]
 }

@@ -88,6 +88,7 @@ Run workflow:
 - `GET /v1/runs`
 - `GET /v1/runs/{id}`
 - `POST /v1/runs/{id}/reserve`
+- `POST /v1/runs/{id}/switch-vessel`
 - `POST /v1/runs/{id}/start`
 - `POST /v1/runs/{id}/observations`
 - `POST /v1/runs/{id}/conditioning`
@@ -107,6 +108,25 @@ shape:
 }
 ```
 
+## Pre-Start Vessel Switch
+
+A reserved run can move to a different vessel before fermentation starts:
+
+- `POST /v1/runs/{id}/switch-vessel` with `{"vessel_id": "..."}`
+
+The run must be `reserved` without a start time. The target vessel must exist,
+differ from the current vessel, be `available`, and hold at least the run's
+planned volume. The attached formula and planned volume never change.
+
+The re-point, the claim of the new vessel (`available -> reserved`), and the
+release of the original vessel (`reserved -> available`) are validated and
+persisted as one atomic revision. A failed step, a vessel already taken by a
+concurrent switch, or a stale `X-Expected-Version` leaves the run and both
+vessels in their pre-switch state. A successful response returns the run plus
+both `previous_vessel` and new `vessel`, and each subsequent run/vessel read
+reflects the same final ownership. Starting with the pre-switch run version is
+rejected with `revision_conflict`.
+
 ## Workflow Checks
 
 Run each production workflow check separately:
@@ -115,6 +135,7 @@ Run each production workflow check separately:
 go run ./cmd/fermentctl check formula-approval
 go run ./cmd/fermentctl check vessel-run-lifecycle
 go run ./cmd/fermentctl check observations-completion
+go run ./cmd/fermentctl check vessel-switch
 ```
 
 Each check creates a temporary snapshot directory, starts the real HTTP
@@ -142,6 +163,7 @@ for later engineering evaluation:
 - target gravity and process-step range validation;
 - aggregate version conflict checks;
 - atomic vessel reservation and release;
+- controlled pre-start vessel switching and concurrent switch arbitration;
 - run state transition guards;
 - observation sequence and time ordering;
 - gravity movement and range checks;

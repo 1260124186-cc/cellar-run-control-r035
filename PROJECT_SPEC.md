@@ -73,6 +73,11 @@ and `aborted`.
 - Planned volume is greater than zero and cannot exceed vessel capacity.
 - Only an approved formula may be attached to a run.
 - `planned -> reserved` atomically reserves an available vessel.
+- A reserved, not-yet-started run can switch to a different available vessel
+  whose capacity holds the planned volume. The claim of the new vessel, the
+  release of the original vessel, and the run re-point commit as one atomic
+  revision; the formula and planned volume do not change. A failed, stale, or
+  concurrent-losing switch leaves every aggregate unchanged.
 - `reserved -> fermenting` requires that the vessel still belongs to the run.
 - `fermenting -> conditioning` requires at least two observations.
 - `conditioning -> completed` requires at least three observations.
@@ -122,13 +127,17 @@ Public entry points are:
 - `POST /v1/vessels`
 - `POST /v1/runs`
 - `POST /v1/runs/{id}/reserve`
+- `POST /v1/runs/{id}/switch-vessel`
 - `POST /v1/runs/{id}/start`
 - `GET /v1/runs/{id}`
 
 The client registers a vessel, creates a planned run against an approved
-formula, reserves the vessel, starts fermentation, and reads the run. Capacity
-conflicts, an unavailable vessel, duplicate run codes, and stale versions
-produce stable failures without changing vessel or run state.
+formula, reserves the vessel, optionally switches to a different available
+vessel before fermentation begins, starts fermentation, and reads the run.
+Capacity conflicts, an unavailable vessel, a switch after the run has started,
+duplicate run codes, and stale versions produce stable failures without
+changing vessel or run state. A switch returns the run together with both the
+previous and the new vessel so the final ownership is unambiguous.
 
 This path crosses HTTP protocol handling, application orchestration, domain
 rules, storage coordination, and resource lifecycle.
@@ -210,13 +219,14 @@ task owns systematic tests for validation boundaries, state transitions,
 numeric calculations, stale revisions, storage failures, and concurrent
 reservation attempts.
 
-The current build command is `go build ./...`. Three bounded production checks
+The current build command is `go build ./...`. Four bounded production checks
 start the real HTTP handler, issue real JSON requests, check success and failure
 behavior, and exit without external services:
 
 - `go run ./cmd/fermentctl check formula-approval`
 - `go run ./cmd/fermentctl check vessel-run-lifecycle`
 - `go run ./cmd/fermentctl check observations-completion`
+- `go run ./cmd/fermentctl check vessel-switch`
 
 ## Scope Limits
 

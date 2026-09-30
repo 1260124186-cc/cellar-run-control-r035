@@ -16,23 +16,34 @@ type formulaView struct {
 
 type vesselView struct {
 	ID          string             `json:"id"`
+	Code        string             `json:"code"`
+	CapacityL   float64            `json:"capacity_liters"`
 	State       domain.VesselState `json:"state"`
 	Version     int64              `json:"version"`
 	ActiveRunID *string            `json:"active_run_id"`
 }
 
 type runView struct {
-	ID           string                      `json:"id"`
-	State        domain.RunState             `json:"state"`
-	Version      int64                       `json:"version"`
-	VesselID     *string                     `json:"vessel_id"`
-	Observations []domain.GravityObservation `json:"observations"`
-	Metrics      *domain.RunMetrics          `json:"metrics"`
+	ID             string                      `json:"id"`
+	Code           string                      `json:"code"`
+	FormulaID      string                      `json:"formula_id"`
+	PlannedVolumeL float64                     `json:"planned_volume_liters"`
+	State          domain.RunState             `json:"state"`
+	Version        int64                       `json:"version"`
+	VesselID       *string                     `json:"vessel_id"`
+	Observations   []domain.GravityObservation `json:"observations"`
+	Metrics        *domain.RunMetrics          `json:"metrics"`
 }
 
 type pairView struct {
 	Run    runView    `json:"run"`
 	Vessel vesselView `json:"vessel"`
+}
+
+type switchView struct {
+	Run            runView    `json:"run"`
+	PreviousVessel vesselView `json:"previous_vessel"`
+	Vessel         vesselView `json:"vessel"`
 }
 
 func createFormulaPayload(name string) map[string]any {

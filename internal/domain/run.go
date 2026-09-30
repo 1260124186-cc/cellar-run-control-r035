@@ -79,6 +79,22 @@ func (r *FermentationRun) ReserveVessel(vesselID string, now time.Time) error {
 	return nil
 }
 
+func (r *FermentationRun) SwitchVessel(vesselID string, now time.Time) error {
+	if r.State != RunReserved || r.VesselID == nil {
+		return NewError(CodeRunState,
+			"only a reserved run can switch vessels")
+	}
+	if r.HadStarted() {
+		return NewError(CodeRunState,
+			"a run that has started fermentation cannot switch vessels")
+	}
+	value := vesselID
+	r.VesselID = &value
+	r.UpdatedAt = now.UTC()
+	r.Version++
+	return nil
+}
+
 func (r *FermentationRun) StartFermentation(now time.Time) error {
 	if r.State != RunReserved || r.VesselID == nil {
 		return NewError(CodeRunState, "only a reserved run can start fermentation")

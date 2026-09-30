@@ -19,6 +19,10 @@
     {
       "workflow_id": "observations-completion",
       "command": "go run ./cmd/fermentctl check observations-completion"
+    },
+    {
+      "workflow_id": "vessel-switch",
+      "command": "go run ./cmd/fermentctl check vessel-switch"
     }
   ]
 }

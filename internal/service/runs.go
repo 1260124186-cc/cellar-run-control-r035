@@ -138,6 +138,77 @@ func (s *Service) StartRun(
 	return updatedRun, updatedVessel, nil
 }
 
+func (s *Service) SwitchRunVessel(
+	id string,
+	input SwitchRunVesselInput,
+) (domain.FermentationRun, domain.Vessel, domain.Vessel, error) {
+	var updatedRun domain.FermentationRun
+	var updatedPrevious domain.Vessel
+	var updatedTarget domain.Vessel
+	err := s.store.Execute(func(snapshot *domain.Snapshot) error {
+		run, ok := snapshot.Runs[id]
+		if !ok {
+			return domain.NewError(domain.CodeRunNotFound, "run was not found")
+		}
+		if err := s.checkExpected(run.Version, input.ExpectedVersion); err != nil {
+			return err
+		}
+		if run.State != domain.RunReserved || run.VesselID == nil {
+			return domain.NewError(domain.CodeRunState,
+				"only a reserved run that has not started can switch vessels")
+		}
+		if run.HadStarted() {
+			return domain.NewError(domain.CodeRunState,
+				"a run that has started fermentation cannot switch vessels")
+		}
+		previous, ok := snapshot.Vessels[*run.VesselID]
+		if !ok {
+			return domain.NewError(domain.CodeVesselNotFound,
+				"currently reserved vessel was not found")
+		}
+		if previous.ActiveRunID == nil || *previous.ActiveRunID != run.ID {
+			return domain.NewError(domain.CodeVesselState,
+				"reserved vessel belongs to a different run")
+		}
+		target, ok := snapshot.Vessels[input.VesselID]
+		if !ok {
+			return domain.NewError(domain.CodeVesselNotFound, "vessel was not found")
+		}
+		if target.ID == previous.ID {
+			return domain.FieldError(domain.CodeInvalidInput, "vessel_id",
+				"the new vessel must differ from the currently reserved vessel")
+		}
+		if run.PlannedVolumeL > target.CapacityL {
+			return domain.FieldError(domain.CodeInvalidInput,
+				"planned_volume_liters", "exceeds vessel capacity")
+		}
+		now := s.clock.Now()
+		// The replacement is claimed before the original yields it; every
+		// guarded step runs inside this one transaction, so a failure
+		// anywhere leaves both vessels and the run at their pre-switch state.
+		if err := target.AcceptSwitch(run.ID, now); err != nil {
+			return err
+		}
+		if err := previous.YieldForSwitch(run.ID, now); err != nil {
+			return err
+		}
+		if err := run.SwitchVessel(target.ID, now); err != nil {
+			return err
+		}
+		snapshot.Runs[id] = run.Clone()
+		snapshot.Vessels[previous.ID] = previous
+		snapshot.Vessels[target.ID] = target
+		updatedRun = run.Clone()
+		updatedPrevious = previous
+		updatedTarget = target
+		return nil
+	})
+	if err != nil {
+		return domain.FermentationRun{}, domain.Vessel{}, domain.Vessel{}, err
+	}
+	return updatedRun, updatedPrevious, updatedTarget, nil
+}
+
 func (s *Service) AbortRun(
 	id string,
 	input VersionInput,

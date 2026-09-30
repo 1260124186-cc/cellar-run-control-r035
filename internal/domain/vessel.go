@@ -78,6 +78,31 @@ func (v *Vessel) FinishCleaning(now time.Time) error {
 	return nil
 }
 
+func (v *Vessel) AcceptSwitch(runID string, now time.Time) error {
+	if v.State != VesselAvailable || v.ActiveRunID != nil {
+		return NewError(CodeVesselUnavailable,
+			"vessel is not available to receive a switched run")
+	}
+	run := runID
+	v.State = VesselReserved
+	v.ActiveRunID = &run
+	v.UpdatedAt = now.UTC()
+	v.Version++
+	return nil
+}
+
+func (v *Vessel) YieldForSwitch(runID string, now time.Time) error {
+	if v.State != VesselReserved || v.ActiveRunID == nil || *v.ActiveRunID != runID {
+		return NewError(CodeVesselState,
+			"vessel is not reserved by this run and cannot yield it")
+	}
+	v.State = VesselAvailable
+	v.ActiveRunID = nil
+	v.UpdatedAt = now.UTC()
+	v.Version++
+	return nil
+}
+
 func (v *Vessel) ReleaseReservation(runID string, now time.Time) error {
 	if v.State != VesselReserved && v.State != VesselInUse {
 		return NewError(CodeVesselState, "vessel does not have a releasable run")
